@@ -46,11 +46,12 @@ const tempRoots: string[] = []
 const createNpmGlobalInstallModuleUrl = () => {
   const root = mkdtempSync(join(tmpdir(), 'hive-update-npm-global-'))
   tempRoots.push(root)
-  const packageRoot = join(root, 'node_modules/@tt-a1i/hive')
+  const prefix = join(root, 'custom prefix')
+  const packageRoot = join(prefix, 'node_modules/@tt-a1i/hive')
   const cliDir = join(packageRoot, 'dist/src/cli')
   mkdirSync(cliDir, { recursive: true })
   writeFileSync(join(packageRoot, 'package.json'), JSON.stringify({ name: '@tt-a1i/hive' }))
-  return { moduleUrl: pathToFileURL(join(cliDir, 'hive-update.js')).href, prefix: root }
+  return { moduleUrl: pathToFileURL(join(cliDir, 'hive-update.js')).href, prefix }
 }
 
 beforeEach(() => {
@@ -297,7 +298,7 @@ describe('hive update cli', () => {
       },
     ])
     expect(logSpy).toHaveBeenCalledWith(
-      `Running: npm install -g @tt-a1i/hive@latest ${ignoreScripts} --prefix ${process.platform === 'win32' ? `"${install.prefix}"` : install.prefix}`
+      `Running: npm install -g @tt-a1i/hive@latest ${ignoreScripts} --prefix ${process.platform === 'win32' ? `"${install.prefix}"` : `'${install.prefix}'`}`
     )
     expect(logSpy).toHaveBeenCalledWith(
       'Hive updated. Restart any running Hive process to pick up the new version.'
@@ -378,7 +379,7 @@ describe('hive update cli', () => {
     // EACCES / sudo-required installs land here; the recovery hint must be
     // surfaced on this path too, not only on spawn ENOENT.
     expect(errorSpy).toHaveBeenCalledWith(
-      `You can run the upgrade manually: npm install -g @tt-a1i/hive@latest ${ignoreScripts} --prefix ${process.platform === 'win32' ? `"${install.prefix}"` : install.prefix}`
+      `You can run the upgrade manually: npm install -g @tt-a1i/hive@latest ${ignoreScripts} --prefix ${process.platform === 'win32' ? `"${install.prefix}"` : `'${install.prefix}'`}`
     )
   })
 
@@ -400,7 +401,7 @@ describe('hive update cli', () => {
     expect(code).toBe(1)
     expect(errorSpy).toHaveBeenCalledWith('Failed to spawn npm: spawn npm ENOENT')
     expect(errorSpy).toHaveBeenCalledWith(
-      `You can run the upgrade manually: npm install -g @tt-a1i/hive@latest ${ignoreScripts} --prefix ${process.platform === 'win32' ? `"${install.prefix}"` : install.prefix}`
+      `You can run the upgrade manually: npm install -g @tt-a1i/hive@latest ${ignoreScripts} --prefix ${process.platform === 'win32' ? `"${install.prefix}"` : `'${install.prefix}'`}`
     )
   })
 
