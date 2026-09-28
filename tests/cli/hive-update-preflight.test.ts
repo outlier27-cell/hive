@@ -5,7 +5,6 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterEach, expect, test } from 'vitest'
-import { defaultRunUpdate } from '../../src/cli/hive-update.js'
 
 const roots: string[] = []
 const require = createRequire(import.meta.url)
@@ -53,7 +52,7 @@ const fixture = (userConfig: string, projectConfig: string) => {
       runUpdate: async (command, args) => { writeFileSync(${JSON.stringify(marker)}, JSON.stringify(args)); return {exitCode: 42}; }
     });
   `)
-  return { root, prefix, marker, env, run, update }
+  return { root, prefix, marker, env, moduleUrl, run, update }
 }
 
 test.each([
@@ -81,20 +80,32 @@ test.each([
 })
 
 test.skipIf(process.platform !== 'win32')(
-  'Windows update child receives a space-bearing prefix intact',
-  async () => {
+  'Windows hive update passes a space-bearing prefix intact through npm.cmd',
+  () => {
     const f = fixture('', '')
-    const shim = join(f.prefix, 'npm probe.cmd')
-    const probe = join(f.prefix, 'record-args.cjs')
+    const shim = join(f.root, 'npm.cmd')
+    const probe = join(f.root, 'record-args.cjs')
     const output = join(f.root, 'received-args.json')
     writeFileSync(
       probe,
-      `require('node:fs').writeFileSync(${JSON.stringify(output)}, JSON.stringify(process.argv.slice(2)))`
+      `require('node:fs').writeFileSync(${JSON.stringify(output)}, JSON.stringify(process.argv.slice(2))); process.exit(42)`
     )
     writeFileSync(shim, `@"${process.execPath}" "${probe}" %*\r\n`)
-    const args = ['install', '-g', '@tt-a1i/hive@2.1.19', '--prefix', f.prefix]
-    const result = await defaultRunUpdate(shim, args)
-    expect(result).toEqual({ exitCode: 0 })
-    expect(JSON.parse(readFileSync(output, 'utf8'))).toEqual(args)
+    const result = f.run(`
+      import {runHiveUpdateCommand} from ${JSON.stringify(updateUrl)};
+      const pathKey = Object.keys(process.env).find((key) => key.toLowerCase() === 'path') ?? 'PATH';
+      process.env[pathKey] = ${JSON.stringify(f.root)} + ';' + (process.env[pathKey] ?? '');
+      process.exitCode = await runHiveUpdateCommand([], {env: {}, moduleUrl: ${JSON.stringify(f.moduleUrl)}});
+    `)
+
+    expect(result.status).toBe(42)
+    expect(JSON.parse(readFileSync(output, 'utf8'))).toEqual([
+      'install',
+      '-g',
+      '@tt-a1i/hive@latest',
+      '--ignore-scripts',
+      '--prefix',
+      f.prefix,
+    ])
   }
 )
