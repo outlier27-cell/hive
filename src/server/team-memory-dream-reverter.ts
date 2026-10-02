@@ -13,7 +13,7 @@ type RevertableDreamRunRecord = DreamRunRecord & { revertBlob: DreamRunRevertBlo
 
 const MEMORY_STATUSES = new Set(['active', 'candidate', 'archived', 'rejected'])
 const MEMORY_SOURCES = new Set(['manual', 'dream'])
-const MEMORY_SOURCE_TYPES = new Set(['manual', 'message', 'dispatch', 'report', 'dream'])
+const MEMORY_SOURCE_TYPES = new Set(['manual', 'message', 'dispatch', 'report', 'dream', 'memory'])
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null

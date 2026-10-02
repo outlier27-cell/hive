@@ -716,6 +716,31 @@ describe('memory dream manual runner', () => {
     ])
   })
 
+  test('revert preserves the supersession history of a rewritten decision', async () => {
+    if (!server) throw new Error('Expected test server')
+    const workspace = createWorkspace()
+    const old = addActiveMemory(workspace.id, 'Use SQLite.', 'decision')
+    const replacement = server.store.addMemoryEntry({
+      workspaceId: workspace.id,
+      actor: { id: `${workspace.id}:orchestrator`, name: 'Orchestrator', role: 'orchestrator' },
+      kind: 'decision',
+      body: 'Use PostgreSQL.',
+      supersedesId: old.id,
+    })
+    writeDreamOutput({
+      ops: [{ op: 'rewrite', id: replacement.id, body: 'Use PostgreSQL with backups.' }],
+    })
+    const completed = await triggerDream(workspace.id)
+    const reverted = await revertDream(workspace.id, completed.body.run.id)
+    expect(reverted.status).toBe(200)
+    expect(server.store.getMemoryEntry(workspace.id, replacement.id)).toMatchObject({
+      body: replacement.body,
+      status: 'active',
+      sources: replacement.sources,
+    })
+    expect(server.store.getMemoryEntry(workspace.id, old.id)?.status).toBe('archived')
+  })
+
   test('revert handles runs that only added new dream entries', async () => {
     if (!server) throw new Error('Expected test server')
     const workspace = createWorkspace()
