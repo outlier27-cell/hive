@@ -731,6 +731,10 @@ describe('memory dream manual runner', () => {
       ops: [{ op: 'rewrite', id: replacement.id, body: 'Use PostgreSQL with backups.' }],
     })
     const completed = await triggerDream(workspace.id)
+    expect(server.store.getMemoryEntry(workspace.id, replacement.id)).toMatchObject({
+      body: 'Use PostgreSQL with backups.',
+      status: 'active',
+    })
     const reverted = await revertDream(workspace.id, completed.body.run.id)
     expect(reverted.status).toBe(200)
     expect(server.store.getMemoryEntry(workspace.id, replacement.id)).toMatchObject({
@@ -780,6 +784,10 @@ describe('memory dream manual runner', () => {
         .listMemoryEntries(workspace.id, { statuses: ['active'] })
         .map((entry) => entry.id)
     ).toEqual([replacement.id])
+    expect(
+      server.store.searchMemoryEntries(workspace.id, 'PostgreSQL').map((entry) => entry.id)
+    ).toEqual([replacement.id])
+    expect(server.store.searchMemoryEntries(workspace.id, 'SQLite')).toEqual([])
   })
 
   test('revert handles runs that only added new dream entries', async () => {
