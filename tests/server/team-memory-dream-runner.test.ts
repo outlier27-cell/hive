@@ -741,6 +741,47 @@ describe('memory dream manual runner', () => {
     expect(server.store.getMemoryEntry(workspace.id, old.id)?.status).toBe('archived')
   })
 
+  test('revert does not revive a decision superseded after the Dream started', async () => {
+    if (!server) throw new Error('Expected test server')
+    const workspace = createWorkspace()
+    const old = addActiveMemory(workspace.id, 'Use SQLite.', 'decision')
+    writeDreamOutput({
+      ops: [{ op: 'rewrite', id: old.id, body: 'Use SQLite with WAL.' }],
+    })
+    const completed = await triggerDream(workspace.id)
+    expect(server.store.getMemoryEntry(workspace.id, old.id)).toMatchObject({
+      body: 'Use SQLite with WAL.',
+      status: 'active',
+    })
+
+    const replacement = server.store.addMemoryEntry({
+      workspaceId: workspace.id,
+      actor: { id: `${workspace.id}:orchestrator`, name: 'Orchestrator', role: 'orchestrator' },
+      kind: 'decision',
+      body: 'Use PostgreSQL.',
+      supersedesId: old.id,
+    })
+    const reverted = await revertDream(workspace.id, completed.body.run.id)
+
+    expect(reverted.status).toBe(200)
+    expect(server.store.getMemoryEntry(workspace.id, old.id)).toMatchObject({
+      body: 'Use SQLite with WAL.',
+      status: 'archived',
+    })
+    expect(server.store.getMemoryEntry(workspace.id, replacement.id)).toMatchObject({
+      body: 'Use PostgreSQL.',
+      status: 'active',
+      sources: expect.arrayContaining([
+        expect.objectContaining({ sourceType: 'memory', sourceId: old.id }),
+      ]),
+    })
+    expect(
+      server.store
+        .listMemoryEntries(workspace.id, { statuses: ['active'] })
+        .map((entry) => entry.id)
+    ).toEqual([replacement.id])
+  })
+
   test('revert handles runs that only added new dream entries', async () => {
     if (!server) throw new Error('Expected test server')
     const workspace = createWorkspace()
